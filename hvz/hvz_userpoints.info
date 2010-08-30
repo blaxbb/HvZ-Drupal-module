@@ -1,0 +1,7 @@
+; $Id$
+name = HvZ User Points
+description = HvZ User Points integration
+package = Humans vs Zombies
+dependencies[] = hvz
+dependencies[] = userpoints
+core = 6.x

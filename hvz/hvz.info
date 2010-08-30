@@ -1,0 +1,5 @@
+; $Id$
+name = HvZ Game Engine
+description = HvZ Game Engine for Drupal
+package = Humans vs Zombies
+core = 6.x

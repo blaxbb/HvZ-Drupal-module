@@ -1,0 +1,6 @@
+; $Id$
+name = HvZ Exporter
+description = Provides ability to export the player list to a CSV file for the HvZ module.
+package = Humans vs Zombies
+dependencies[] = hvz
+core = 6.x

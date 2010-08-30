@@ -1,0 +1,39 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Installs the `hvz_cure` database table on install of hvz_cure module.
+ */
+
+function hvz_cure_schema() {
+
+$schema['hvz_cure'] = array(
+    'description' => t('The base table for nodes.'),
+    'fields' => array(
+      'cid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'cure' => array(
+        'type' => 'varchar',
+        'length' => '12',
+        'not null' => TRUE),
+      ),
+    'unique keys' => array(
+      'cid'     => array('cid')
+      ),
+    'primary key' => array('cid'),
+    );
+    return $schema;
+}
+
+function hvz_cure_install() {
+  // Create my tables.
+  drupal_install_schema('hvz_cure');
+}
+
+function hvz_cure_uninstall() {
+  // Drop my tables.
+  drupal_uninstall_schema('hvz_cure');
+}

@@ -1,0 +1,61 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Installs the `hvz` database table on install of hvz module.
+ */
+
+
+function hvz_schema() {
+
+$schema['hvz'] = array(
+    'description' => t('The base table for nodes.'),
+    'fields' => array(
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'killid' => array(
+        'type' => 'varchar',
+        'length' => '8',
+        'not null' => TRUE),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE, ),
+      'tags' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE, ),
+      'killedbyuid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE, ),
+      'killedtime' => array(
+        'type' => 'int',
+        'size' => 'big',
+        'not null' => TRUE,
+        'unsigned' => TRUE, ),
+      'oz' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE, ),
+      ),
+    'unique keys' => array(
+      'uid'     => array('uid')
+      ),
+      'primary key' => array('uid'),
+    );
+    return $schema;
+}
+
+function hvz_install() {
+  // Create my tables.
+  drupal_install_schema('hvz');
+}
+
+function hvz_uninstall() {
+  // Drop my tables.
+  drupal_uninstall_schema('hvz');
+}

@@ -1,0 +1,46 @@
+<?php
+// $Id$
+
+function hvz_exporter_menu() {
+  $items = array();
+
+  $items['admin/settings/hvz/export'] = array(
+    'title' => 'HvZ Exporter',
+    'description' => 'Exports player data to csv file',
+    'page callback' => 'hvz_exporter_page',
+    'access arguments' => array('change game status for hvz'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+function hvz_exporter_page() {
+    $page = '';
+    switch ($filter) {
+    default:
+      $query = db_query("SELECT * FROM {hvz}");
+      break;
+    case 1:
+      $query = db_query("SELECT * FROM {hvz} WHERE `status`='1' OR `status` = '4'");
+      break;
+    case 2:
+      $query = db_query("SELECT * FROM {hvz} WHERE `status`='2' OR `status` = '3'");
+      break;
+    }
+
+    while ($player = db_fetch_object($query)) {
+      $account = user_load($player->uid);
+      if (url($account->picture) != url())  {
+        $picurl = url($account->picture, array (
+          'absolute' => TRUE
+        )
+        );
+      }
+      else  {
+        $picurl ='';
+      }
+      $page .= $account->name . ',' . $player->killid . ',' . $picurl . '<br />';
+    }
+    return $page;    
+}

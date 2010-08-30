@@ -1,0 +1,1092 @@
+<?php
+// $Id$
+
+function hvz_help($path, $arg) {
+
+  $output = ''; //declare your output variable
+
+  switch ($path) {
+    case "admin/help#hvz":
+      $output = '<p>' .  t("HvZ Module Help") . '</p>';
+      break;
+  }
+  return $output;
+}
+
+function hvz_perm() {
+  return array(
+    'view player status for hvz',
+    'play hvz',
+    'change player status for hvz',
+    'change game status for hvz',
+    'view hvz info',
+    'view hidden oz',
+  );
+}
+
+function hvz_register_user($uid) {
+  $killid = hvz_generate_id();
+}
+
+function hvz_generate_id() {
+  $complete = 0;
+  $debug = '';
+  while ($complete == 0) {
+    $length = variable_get('hvz_killidlength', 6);
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    $genid = '';
+    $dupids = '';
+
+    for ($i = 0; $i < $length; $i++) {
+      $debug .= $i;
+      $genid .= $chars[mt_rand(0, strlen($chars) -1)];
+    }
+
+    $dupids = hvz_get_user_from_id($genid);
+
+    if ($dupids == '') {
+      return $genid;
+    }
+  }
+}
+
+function hvz_get_playing($uid) {
+  $query = "SELECT uid FROM " . "{hvz} WHERE uid='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $found .= $queryids->uid;
+  }
+  if ($found != '') {
+
+    return TRUE;
+  }
+  return FALSE;
+}
+
+function hvz_get_ozopt($uid) {
+  $query = "SELECT uid, oz FROM " . "{hvz} WHERE uid='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $oz .= $queryids->oz;
+  }
+  return $oz;
+}
+
+function hvz_get_user_from_id($killid = '') {
+  $ids = '';
+
+  $query = "SELECT uid, killid FROM " . "{hvz} WHERE killid='%s'";
+  $query_result = db_query($query, $killid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $uid .= $queryids->uid;
+
+  }
+  return $uid;
+}
+
+function hvz_get_id_from_user($uid) {
+
+  $ids = '';
+  $query = "SELECT * FROM {hvz} WHERE `uid`='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $ids .= $queryids->killid;
+  }
+  return $ids;
+}
+
+function hvz_set_id($uid, $killid) {
+
+  $user = user_load($uid);
+  $query = "UPDATE {hvz} SET killid = '%s' WHERE uid = %d";
+
+  //$query = 'UPDATE {hvz} SET killid = "$killid" WHERE {hvz}.`uid` = %d';
+
+  db_query($query, $killid, $uid);
+
+  //TODO:NOTIFY NEW ZOMBIE
+
+
+  //drupal_set_message('Set %users kill ID to %killid.',array('%user'=>$user->name,'%killid'=>$killid));
+
+}
+
+function hvz_id_exists($uid) {
+  if ((hvz_get_id_from_user($uid)) == '') {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+
+function hvz_admin() {
+
+  $form = array();
+  $form['hvz_admin_set'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('HvZ Engine'),
+    '#description' => t('Humans vs Zombies Engine Settings'),
+    '#collapsible' => TRUE,
+    '#tree' => TRUE,
+    '#weight' => -5,
+  );
+  $form['hvz_admin_set']['hvz_killidlength'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Length of KillID'),
+    '#default_value' => variable_get('hvz_killidlength', 6),
+    '#size' => 6,
+    '#maxlength' => 6,
+    '#description' => t("Length of a player's KillID"),
+    '#disabled' => TRUE,
+  );
+
+  $form['hvz_admin_set']['hvz_gamestate'] = array(
+    '#type' => 'radios',
+    '#title' => t('Gamestate'),
+    '#description' => t("Change the level of gameplay"),
+    '#default_value' => variable_get('hvz_gamestate', 0),
+    '#options' => array(t('Registration Open'), t('Choose OZ'), t('Game Start'), t('OZ Revealed'), t('Game Over')),
+  );
+  $form['#submit'][] = 'hvz_admin_submit';
+  return system_settings_form($form);
+
+}
+function hvz_admin_submit($form, &$form_state) {
+
+  $gamestate = $form_state['values']['hvz_admin_set']['hvz_gamestate'];
+  switch ($gamestate) {
+    case 0:
+
+      break;
+
+    case 1:
+
+      break;
+    case 2:
+
+      break;
+    case 3:
+      drupal_set_message(t('ALL OZS REVEALED!'));
+      hvz_reveal_ozs();
+      break;
+    case 4:
+
+      break;
+
+  }
+  variable_set('hvz_gamestate', $gamestate);
+}
+
+
+function hvz_admin_validate($form, &$form_state) {
+
+}
+
+function hvz_get_tags($uid) {
+
+  $res = '';
+  $query = "SELECT * FROM {hvz} WHERE `uid`='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $res .= $queryids->tags;
+  }
+  return $res;
+}
+
+function hvz_set_tags($uid, $tags) {
+
+  $res = '';
+  $query = "UPDATE {hvz} SET tags = '%d' WHERE {hvz}.`uid` = '%d'";
+  db_query($query, $tags, $uid);
+
+  return $res;
+}
+
+
+function hvz_set_status($uid, $status) {
+  $user = user_load($uid);
+  $query = "UPDATE {hvz} SET status = '%d' WHERE {hvz}.`uid` = '%d'";
+  db_query($query, $status, $uid);
+  drupal_set_message(t('Set user ' . user_load($uid)->name . ' to status \'' . hvz_int_to_status($status) . '\''));
+
+  //TODO:NOTIFY NEW ZOMBIE
+
+  //drupal_set_message('Set %users status to %status.',array('%user'=>$user->name,'%status'=>hvz_int_to_status($status)));
+
+}
+function hvz_get_killedby_name($uid) {
+
+  $res = '';
+  $query = "SELECT `killedbyuid` FROM {hvz} WHERE `uid`='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $res .= $queryids->killedbyuid;
+  }
+  $killer = user_load($res);
+  if ((hvz_get_status($killer->uid)) == 4) {
+    return 'An Original Zombie';
+  }
+  return $killer->name;
+
+}
+function hvz_get_killedby_uid($uid) {
+
+  $res = '';
+  $query = "SELECT `killedbyuid` FROM {hvz} WHERE `uid`='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $res .= $queryids->killedbyuid;
+  }
+
+  return $res;
+
+}
+
+function hvz_get_status($uid) {
+
+  $res = '';
+  $query = "SELECT `status` FROM {hvz} WHERE `uid`='%d'";
+  $query_result = db_query($query, $uid);
+  while ($queryids = db_fetch_object($query_result)) {
+    $res .= $queryids->status;
+  }
+  return $res;
+
+}
+
+function hvz_int_to_status($status) {
+
+  switch ($status) {
+    case 1:
+      return 'Human Resistance';
+      break;
+    case 2:
+      return 'Zombie Horde';
+      break;
+    case 3:
+      return 'Horde(Original)';
+      //revealed OZ
+
+      break;
+    case 4:
+      if (user_access('view hidden oz')) {
+        return 'Hidden OZ';
+      }
+      return 'Human Resistance';
+      //hidden OZ
+
+      break;
+  }
+}
+
+function hvz_menu() {
+
+  $items = array();  
+
+  $items['admin/settings/hvz'] = array(
+    'title' => 'HvZ',
+    'description' => 'HvZ Game Administration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hvz_admin'),
+    'access arguments' => array('change game status for hvz'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/settings/hvz/settings'] = array(
+    'title' => 'HvZ Settings',
+    'description' => 'HvZ Game Administration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hvz_admin'),
+    'access arguments' => array('change game status for hvz'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+  $items['admin/settings/hvz/ozselection'] = array(
+    'title' => 'HvZ OZ Selection',
+    'description' => 'OZ Selection',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hvz_oz_select_form'),
+    'access arguments' => array('change game status for hvz'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['regkill'] = array(
+    'title' => 'Register a tag',
+    'page callback' => 'hvz_reg_tag_page',
+    'access arguments' => array('play hvz'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['hvzplayers'] = array(
+    'title' => 'HvZ Players List',
+    'page callback' => 'hvz_players_page',
+    'access arguments' => array('view hvz info'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['hvzplayers/humans'] = array(
+    'title' => 'HvZ Survivors List',
+    'page callback' => 'hvz_players_page',
+    'page arguments' => array('1'),
+    'access arguments' => array('view hvz info'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['hvzplayers/zombies'] = array(
+    'title' => 'HvZ Zombies List',
+    'page callback' => 'hvz_players_page',
+    'page arguments' => array('2'),
+    'access arguments' => array('view hvz info'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%/hvz'] = array(
+    'title' => 'HvZ',
+    'page callback' => 'hvz_view_player',
+    'page arguments' => array(1),
+    'access arguments' => array('view player status for hvz'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
+  $items['user/%/hvz/view'] = array(
+    'title' => 'View',
+    'page callback' => 'hvz_view_player',
+    'page arguments' => array(1),
+    'access arguments' => array('view player status for hvz'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 5,
+  );
+  $items['user/%/hvz/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'hvz_edit_player',
+    'page arguments' => array(1),
+    'access arguments' => array('change player status for hvz'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+  );
+
+
+  return $items;
+
+}
+
+
+function hvz_user($op, &$edit, &$account, $category = 'account') {
+  $uid = $account->uid;
+  switch ($op) {
+    case 'delete':
+      $query = "DELETE FROM {hvz} WHERE `uid` = '%d'";
+      db_query($query, $uid);
+      drupal_set_message(t('UID ' . $uid . ' deleted from HvZ Record.'));
+    case 'form':
+      return hvz_registration_form($uid, FALSE);
+      break;
+    case 'register':
+      return hvz_registration_form($uid, TRUE);
+      break;
+    case 'update':
+    case 'insert':
+      $playhvz = $edit['hvz_reg'][0];
+      $oz = $edit['hvz_reg'][1];
+
+      if ($playhvz) {
+        if (!hvz_get_playing($uid)) {
+          
+          $killid = hvz_generate_id();
+          $default_status = 1;
+          db_query("INSERT INTO {hvz} (uid, killid, status, oz) VALUES (%d, '%s', %d ,%d)", $uid, $killid, $default_status, $oz);
+          drupal_set_message(t('Your HvZ Kill ID is ' . $killid . '.  Write it down and keep it on you at all times!!!'));
+        }
+
+        db_query("UPDATE {hvz} SET oz = '%d' WHERE {hvz}.`uid` = '%d'", $oz, $uid);
+        drupal_set_message(t('Set OZ opt in status to ' . $oz));
+        
+        rules_invoke_event('hvz_human_registered', $account);
+
+      }
+      else {
+        $query = "DELETE FROM {hvz} WHERE `uid` = '%d'";
+        db_query($query, $uid);
+      }
+      break;
+    case 'view':
+
+      break;
+
+  }
+}
+
+function hvz_view_page($uid) {
+  global $user;
+  $tags = hvz_get_tags($uid);
+  $status = hvz_int_to_status(hvz_get_status($uid));
+  if (($user->uid == $uid) | (user_access('view hidden oz'))) {
+    if (hvz_get_status($uid) == 4) {
+      $status .= ' (Hidden OZ)';
+      $tags = 0;
+    }
+
+  }
+  $content = '';
+  $content .= '<strong>Status: </strong>' . $status . '<br />';
+  $content .= '<strong>Tags: </strong>' . $tags . '<br />';
+  if (($uid == $user->uid) | (user_access('change player status for hvz')) | 
+    user_access('access administration pages') ) {
+    //permission to view ID
+
+    $content .= '<br /> <strong>Kill ID: </strong>' . hvz_get_id_from_user($uid);
+
+  }
+
+  return $content;
+}
+
+
+function hvz_edit_form($form_state, $uid) {
+
+  $form = array();
+
+  $form['hvz_killid'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Valid Kill ID'),
+    '#size' => 10,
+    '#maxlength' => 20,
+    '#description' => t("Enter a valid Kill ID"),
+    '#default_value' => hvz_get_id_from_user($uid),
+    '#required' => TRUE,
+  );
+
+  $form['hvz_status'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Player Status'),
+    '#size' => 10,
+    '#maxlength' => 20,
+    '#description' => t("1=Human; 2=Zombie; 3=OZ(revealed); 4=OZ(hidden)"),
+    '#default_value' => hvz_get_status($uid),
+    '#required' => TRUE,
+  );
+  
+  $form['hvz_tags'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Player\'s Tags'),
+    '#size' => 10,
+    '#maxlength' => 20,
+    '#description' => t("Number of tags"),
+    '#default_value' => hvz_get_tags($uid),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+function hvz_edit_form_validate($form, &$form_state) {
+  $killid = $form_state['values']['hvz_killid'];
+  $status = $form_state['values']['hvz_status'];
+
+  //hvz_set_status($uid,$status);
+
+
+
+}
+
+function hvz_edit_form_submit($form, &$form_state) {
+
+  $killid = $form_state['values']['hvz_killid'];
+  $status = $form_state['values']['hvz_status'];
+  $tags = $form_state['values']['hvz_tags'];
+  $uid = arg(1);
+
+  hvz_set_status($uid, $status);
+  hvz_set_id($uid, $killid);
+  hvz_set_tags($uid, $tags);
+
+}
+
+function hvz_reg_tag_block_form() {
+
+  $form = array();
+
+  $form['hvz_registertag'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Register tag'),
+    '#size' => 10,
+    '#maxlength' => variable_get('hvz_killidlength', 6),
+    '#description' => t("Enter a valid Kill ID"),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+
+function hvz_reg_tag_page() {
+  global $user;
+  $gamestate = variable_get('hvz_gamestate', 0);
+
+  $status = hvz_get_status($user->uid);
+  if ($gamestate == 1) {
+    return t('Registering tags is not open yet');
+  }
+  elseif ($gamestate == 4) {
+    return t('The game is over. :(');
+  }
+  elseif (($status <= 4) && ($status >= 2)) {
+    return drupal_get_form('hvz_reg_tag_block_form');
+  }
+  else {
+    return t('You are not a zombie.  Stop trying to eat other people\'s brains.');
+  }
+}
+
+function hvz_reg_tag_block_form_validate($form, &$form_state) {
+  $killid = $form_state['values']['hvz_registertag'];
+  if (strlen($killid) != variable_get('hvz_killidlength', 6)) {
+    form_set_error('hvz_registertag', t('Invalid ID Length'));
+  }
+
+
+}
+
+
+function hvz_reg_tag_page_form_submit($form, &$form_state) {
+
+  $killid = $form_state['values']['hvz_registertag'];
+
+  hvz_check_kill_id($killid);
+}
+
+
+function hvz_reg_tag_page_form_validate($form, &$form_state) {
+  $killid = $form_state['values']['hvz_registertag'];
+  if (strlen($killid) != variable_get('hvz_killidlength', 6)) {
+    form_set_error('hvz_registertag', t('Invalid ID Length'));
+  }
+
+
+}
+
+
+function hvz_reg_tag_block_form_submit($form, &$form_state) {
+
+  $killid = $form_state['values']['hvz_registertag'];
+
+  hvz_check_kill_id($killid);
+}
+
+function hvz_check_kill_id($killid = '') {
+  global $user;
+  $gamestate = variable_get('hvz_gamestate', 0);
+  $uid = hvz_get_user_from_id($killid);
+
+  if (($uid != '') && (($gamestate == 2) | ($gamestate == 3))) {
+    if (hvz_get_status($uid) == 1) {
+      //change uid's status -> zombie
+
+      hvz_turn_to_zombie($uid, $user->uid);
+      //add 1 to users tagcount
+
+      $tags = (hvz_get_tags($user->uid) + 1);
+      hvz_set_tags($user->uid, $tags);
+
+      //set time
+
+      if (module_exists('rules')) {
+        
+        rules_invoke_event('hvz_killed', user_load($uid), $user);
+        
+      }
+      drupal_set_message(t('Successfully infected player %killid.  Kill awarded to %user.', array('%killid' => $killid, '%user' => $user->name)));
+      module_invoke_all('hvz_player_killed', $user, user_load($uid));
+
+    }
+
+    else {
+      drupal_set_message(t('Player is already a zombie.'), 'error');
+    }
+  }
+  else {
+    if (!(($gamestate == 2) | ($gamestate == 3)|($gamestate == 4))) {
+      drupal_set_message(t('Gameplay State Error'), 'error');
+    }
+    drupal_set_message(t('Invalid ID'), 'error');
+  }
+}
+
+function hvz_turn_to_zombie($killeduid, $awardedid) {
+
+  $query = "UPDATE {hvz} SET status = '2', killedbyuid = '%d', `killedtime`='%d' WHERE {hvz}.`uid` = '%d'";
+  db_query($query, $awardedid,   time(), $killeduid);
+
+}
+
+function hvz_players_page($filter = 0) {
+  global $user;
+  if (user_access('change player status for hvz')) {
+    $headers = array(
+      'Username',
+      'Status',
+      'Tags',
+      'Killed By',
+      'Time of Death',
+      'Kill ID'
+    );
+  }
+  else {
+    $headers = array(
+      'Username',
+      'Status',
+      'Tags',
+      'Killed By',
+      'Time of Death',
+    );
+  }
+
+  $rows = array();
+
+  switch ($filter) {
+    default:
+      $query = db_query("SELECT * FROM {hvz}");
+      break;
+    case 1:
+      $query = db_query("SELECT * FROM {hvz} WHERE `status`='1' OR `status` = '4'");
+      break;
+
+    case 2:
+      $query = db_query("SELECT * FROM {hvz} WHERE `status`='2' OR `status` = '3'");
+      break;
+  }
+
+  $oztags = 0;
+
+  while ($player = db_fetch_object($query)) {
+    $account = user_load($player->uid);
+    $status = $player->status;
+    $tags = $player->tags;
+
+    $time = $player->killedtime;
+
+
+    $killeruid = hvz_get_killedby_uid($player->uid);
+    $killerstatus = hvz_get_status($killeruid);
+    $killername = hvz_get_killedby_name($player->uid);
+
+
+    if ($status == 4 ) {
+      $oztags += $tags;
+      $tags = 0;
+      $time = 0;
+    }
+    if ($killerstatus == 4) {
+      $killername = 'An Original Zombie';
+      $l = t('<strong>An Original Zombie</strong>');
+    }
+    else $l = l($killername, 'user/' . $killeruid);
+    if ($status == 3) {
+      $killer = '????????';
+    }
+
+    if ($time == 0) {
+      $date = '';
+    }
+    else {
+      $date = date("F j, Y, g:i a", $time);
+    }
+    if (user_access('change player status for hvz')) {
+      $rows[] = array(
+        l($account->name, 'user/' . $player->uid),
+        hvz_int_to_status($status),
+        $tags,
+        $l,
+        $date,
+        $player->killid,
+        $account->name,
+      );
+    }
+    else {
+      $rows[] = array(
+        l($account->name, 'user/' . $player->uid),
+        hvz_int_to_status($status),
+        $tags,
+        $l,
+        $date,
+        '',
+        $account->name,
+      );
+    }    
+  }
+  if ($rows[0]) {
+  foreach ($rows as $key => $row) {
+    $dates[$key]  = $row[6];
+    // of course, replace 0 with whatever is the date field's index
+
+  }
+  array_multisort($dates, SORT_ASC, $rows);
+  foreach ($rows as $row) {
+    $row[6] = '';
+    $filt[] = $row;
+  }
+  $rows = $filt;
+  }
+
+  if ($oztags > 0) {
+    array_unshift($rows, array(
+      '<strong>Original Zombie(s)</strong>',
+      '<strong>' . hvz_int_to_status(3) . '</strong>',
+      '<strong>' . $oztags . '</strong>',
+      '<strong>????????</strong>',
+      '<strong>????????</strong>',
+    )
+    );
+  }
+
+  $page = '';
+
+  $page .= 'Human Resistance: ' . hvz_numb_humans() . '<br />';
+  $page .= 'Zombie Horde: ' . hvz_numb_zombies() . '<br />';
+  $page .= '<br />';
+
+  $page .= 'Filter by ' . l('Humans, ', 'hvzplayers/humans') . l('Zombies, ', 'hvzplayers/zombies') .  l('None', 'hvzplayers');
+
+  $page .= theme('table', $headers, $rows);
+
+  return $page;
+
+}
+
+function hvz_block($op = 'list', $delta = 0) {
+  global $user;
+  $status = hvz_get_status($user->uid);
+
+  if ($op == "list") {
+    // Generate listing of blocks from this module, for the admin/block page
+
+    $block = array();
+    $block[0]["info"] = t('HvZ Register Tag');
+    $block[1]["info"] = t('HvZ Recent Casualties');
+    return $block;
+  }
+  elseif ($op == 'view') {
+
+    switch ($delta) {
+      case 0:
+        $gamestate = variable_get('hvz_gamestate', 0);
+
+        if (($status >= 2) && (($gamestate == 2) | ($gamestate == 3))) {
+          $block['subject'] = 'Register a Tag';
+          $block['content'] = drupal_get_form('hvz_reg_tag_block_form');
+        }
+        return $block;
+        break;
+      case 1:
+        $block['subject'] = t('Recent Casualties');
+        $block['content'] = hvz_casualties_block();
+        return $block;
+        break;
+    }
+  }
+}
+
+function hvz_edit_player($uid) {
+  $user = user_load($uid);
+
+  drupal_set_title(t('Edit %user_name', array('%user_name' => $user->name)));
+
+  return drupal_get_form('hvz_edit_form', $uid);
+
+}
+
+function hvz_view_player($uid) {
+  $user = user_load($uid);
+
+  drupal_set_title(t('Viewing %user_name', array('%user_name' => $user->name)));
+
+  return hvz_view_page($uid);
+
+}
+
+function hvz_numb_humans() {
+  $count = 0;
+  $query = "SELECT status FROM " . "{hvz}";
+  $query_result = db_query($query);
+  while ($status = db_fetch_object($query_result)) {
+    if (($status->status == 1) | ($status->status == 4)) {
+      $count++;
+
+    }
+  }
+  return $count;
+}
+
+function hvz_numb_zombies() {
+  $count = 0;
+  $query = "SELECT status FROM " . "{hvz}";
+  $query_result = db_query($query);
+  while ($status = db_fetch_object($query_result)) {
+    if (($status->status == 2) | ($status->status == 3)) {
+      $count++;
+
+    }
+  }
+  return $count;
+}
+
+function hvz_registration_form($uid, $registration) {
+  $gamestate = variable_get('hvz_gamestate', 0);
+
+  $form['hvz_reg'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('HvZ Registration'),
+    '#description' => t('Register for Humans vs Zombies'),
+    '#collapsible' => TRUE,
+    '#tree' => TRUE,
+  );
+  if ($registration) {
+    if (($gamestate == 0) | user_access('change player status for hvz')) {
+      $form['hvz_reg'][0] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>Play HvZ</strong>'),
+        '#description' => t("Join the HvZ Player List (REQUIRED TO PARTICIPATE IN HVZ)"),
+        '#default_value' => TRUE,
+      );
+
+
+      $form['hvz_reg'][1] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>OZ Opt in</strong>'),
+        '#description' => t('Volunteer to play as an OZ (you are not guaranteed the role.)'),
+        '#default_value' => FALSE,
+      );
+    }
+    else {
+      $form['hvz_reg'][0] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>Play HvZ</strong>'),
+        '#description' => t("Join the HvZ Player List (REQUIRED TO PARTICIPATE IN HVZ)"),
+        '#default_value' => FALSE,
+        '#disabled' => TRUE,
+      );
+
+
+      $form['hvz_reg'][1] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>OZ Opt in</strong>'),
+        '#description' => t('Volunteer to play as an OZ (you are not guaranteed the role.)'),
+        '#default_value' => FALSE,
+        '#disabled' => TRUE,
+      );
+    }
+  }
+
+  else {
+    if (($gamestate == 0) | user_access('change player status for hvz')) {
+      $form['hvz_reg'][0] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>Play HvZ</strong>'),
+        '#description' => t("Join the HvZ Player List (REQUIRED TO PARTICIPATE IN HVZ)"),
+        '#default_value' => hvz_get_playing($uid),
+      );
+
+
+      $form['hvz_reg'][1] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>OZ Opt in</strong>'),
+        '#description' => t('Volunteer to play as an OZ (you are not guaranteed the role.)'),
+        '#default_value' => hvz_get_ozopt($uid),
+      );
+    }
+    else {
+      $form['hvz_reg'][0] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>Play HvZ</strong>'),
+        '#description' => t("Join the HvZ Player List (REQUIRED TO PARTICIPATE IN HVZ)"),
+        '#default_value' => hvz_get_playing($uid),
+        '#disabled' => TRUE,
+      );
+
+
+      $form['hvz_reg'][1] = array(
+        '#type' => 'checkbox',
+        '#title' => t('<strong>OZ Opt in</strong>'),
+        '#description' => t('Volunteer to play as an OZ (you are not guaranteed the role.)'),
+        '#default_value' => hvz_get_ozopt($uid),
+        '#disabled' => TRUE,
+      );
+    }
+  }
+
+  return $form;
+}
+
+function hvz_oz_select_form() {
+  switch (variable_get('hvz_gamestate', 0)) {
+    case 1:
+      $query = db_query("SELECT * FROM {hvz} WHERE `oz` = '1'");
+      $uids = array();
+      while ($player = db_fetch_object($query)) {
+    
+        $form = array();
+    
+        $account = user_load($player->uid);
+        $uid = $account->uid;
+        $status = hvz_get_status($uid);
+        $form['hvz_ozselect'] = array(
+          '#type' => 'fieldset',
+          '#title' => t('OZ Selection'),
+          '#description' => t('Select OZs'),
+          '#collapsible' => FALSE,
+          '#tree' => TRUE,
+        );
+        $ozuids[] = $uid;
+    
+      }
+      foreach ($ozuids as $id) {
+        $user = user_load($id);
+        switch (hvz_get_status($id)) {
+          case 3:
+          case 4:
+            $form['hvz_ozselect'][] = array(
+              '#type' => 'checkbox',
+              '#title' => l($user->name, 'user/' . $id),
+              '#default_value' => TRUE,
+            );
+            break;
+          default:
+            $form['hvz_ozselect'][] = array(
+              '#type' => 'checkbox',
+              '#title' => l($user->name, 'user/' . $id),
+              '#default_value' => FALSE,
+            );
+            break;
+    
+        }
+        $form['submit'] = array(
+          '#type' => 'submit',
+          '#value' => t('Submit'),
+        );
+      }
+    
+      return $form;
+      break;
+    default:
+      drupal_set_message(t('Gamestate not set to Select OZ'));
+      return '';
+  }
+  
+
+}
+
+function hvz_oz_select_form_submit($form, &$form_state) {
+  $query = db_query("SELECT * FROM {hvz} WHERE `oz` = '1' ORDER BY `uid`");
+  $ozuids = array();
+
+  while ($player = db_fetch_object($query)) {
+    $ozuids[] = $player->uid;
+  }
+
+  $i = 0;
+  foreach ($ozuids as $id) {
+    $user = user_load($id);
+    $selected = $form_state['values']['hvz_ozselect'][$i];
+
+    if ($selected) {
+      hvz_set_oz($user->uid);
+      drupal_set_message(t('Set ' . l($user->name, 'user/' . $user->uid) . ' to be an Original Zombie.'));
+    }
+    else {
+      hvz_set_status($user->uid, 1);
+      rules_invoke_event('hvz_oz_removed', user_load($user->uid));
+    }
+    $i++;
+  }
+}
+function hvz_set_oz($uid) {
+  hvz_set_status($uid, 4);
+  rules_invoke_event('hvz_oz_selected', user_load($uid));
+}
+
+function hvz_rules_event_info() {
+  return array(
+    'hvz_killed' => array(
+      'label' => t('HvZ player killed'),
+      'module' => 'Humans vs Zombies',
+      'arguments' => array(
+        'killed' => array(
+          'type' => 'user',
+          'label' => t('Player who has just been zombified.'),
+        ),
+        'killer' => array(
+          'type' => 'user',
+          'label' => t('Player who earned a kill.'),
+        ),
+      ),
+    ),
+    'hvz_oz_revealed' => array(
+      'label' => t('HvZ oz revealed'),
+      'module' => 'Humans vs Zombies',
+      'arguments' => array(
+        'oz' => array(
+          'type' => 'user',
+          'label' => t('OZ who has just been revealed.'),
+        ),
+      ),
+    ),
+    'hvz_human_registered' => array(
+      'label' => t('HvZ player joins humans'),
+      'module' => 'Humans vs Zombies',
+      'arguments' => array(
+        'oz' => array(
+          'type' => 'user',
+          'label' => t('Human who has just been added.'),
+        ),
+      ),
+    ),
+    'hvz_oz_selected' => array(
+      'label' => t('Player Set as an OZ'),
+      'module' => 'Humans vs Zombies',
+      'arguments' => array(
+        'oz' => array(
+          'type' => 'user',
+          'label' => t('Player set as an OZ.'),
+        ),
+      ),
+    ),
+    'hvz_oz_removed' => array(
+      'label' => t('Player removed as an OZ'),
+      'module' => 'Humans vs Zombies',
+      'arguments' => array(
+        'oz' => array(
+          'type' => 'user',
+          'label' => t('Player removed as an OZ.'),
+        ),
+      ),
+    ),
+  );
+}
+
+function hvz_reveal_ozs() {
+  $query = db_query("SELECT uid FROM {hvz} WHERE `status` = '4'");
+  while ($oz = db_fetch_object($query)) {
+    hvz_set_status($oz->uid, 3);
+    module_invoke_all('hvz_oz_revealed', $oz->uid);
+    if (module_exists('rules')) {
+      rules_invoke_event('hvz_oz_revealed', user_load($oz->uid));
+    }
+  }
+
+}
+
+function hvz_casualties_block() {
+  $query = db_query_range("SELECT uid FROM {hvz} WHERE `status`='2' OR `status` = '3' ORDER BY `killedtime` DESC", 0, 5);
+  $block_content = '';
+  while ($player = db_fetch_object($query)) {
+    $block_content .= l(user_load($player->uid)->name, 'user/' . $player->uid) . '<br />';
+
+  }
+  return $block_content;
+}

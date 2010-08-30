@@ -1,0 +1,152 @@
+<?php
+// $Id$
+
+function hvz_cure_menu() {
+
+  $items = array();
+
+  $items['admin/settings/hvz/cures'] = array(
+    'title' => 'HvZ Cure Generation',
+    'description' => 'Cure Selection',
+    'page callback' => 'hvz_cure_generate_page',
+    'access arguments' => array('change game status for hvz'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+function hvz_cure_block($op = 'list', $delta = 0) {
+  global $user;
+  $uid = $user->uid;
+  switch ($op) {
+    case 'list':
+      $block = array();
+      $block[0]["info"] = t('HvZ Register Cure');
+      return $block;
+      break;
+    case 'view':
+      switch ($delta) {
+        case 0:
+            if (hvz_get_status($uid)>=2) {
+              $block['subject'] = 'Register a Tag';
+              $block['content'] = drupal_get_form('hvz_cure_reg_cure_form');
+            }
+      }
+      break;
+  }
+}
+
+function hvz_cure_reg_cure_form() {
+  $form = array();
+
+  $form['hvz_cure_reg'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Submit a cure'),
+    '#size' => 10,
+    '#maxlength' => variable_get('hvz_cureidlength', 10),
+    '#description' => t("Enter a valid Cure ID"),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+
+function hvz_cure_reg_cure_form_submit($form, &$form_state) {
+  global $user;
+  $cure = $form_state['values']['hvz_cure_reg'];
+
+  if (hvz_cure_get_cure_exist($cure)) {
+    hvz_set_status($user->uid, 1);
+    drupal_set_message('You have been cured!  Try to do better this time....');
+  }
+  else {
+    drupal_set_message('Invalid Cure Number!');
+  }
+}
+
+function hvz_cure_get_cure_exist($cure) {
+
+  $out = '';
+  $query = "SELECT * FROM {hvz_cure} WHERE `cure`='%d'";
+  $query_result = db_query($query, $cure);
+  while ($queryids = db_fetch_object($query_result)) {
+    $ids .= $queryids->cure;
+  }
+  if ($ids != '') {
+    return FALSE;
+  }
+  return FALSE;
+}
+
+function hvz_cure_generate_cure() {
+  $complete = 0;
+  $debug = '';
+  while ($complete == 0) {
+    $length = variable_get('hvz_cureidlength', 10);
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    $genid = '';
+    $dupids = '';
+
+    for ($i = 0; $i < $length; $i++) {
+      $debug .= $i;
+      $genid .= $chars[mt_rand(0, strlen($chars) -1)];
+    }
+
+
+
+    if (!hvz_cure_get_cure_exist($genid)) {
+      return $genid;
+    }
+  }
+}
+
+function hvz_cure_generate_page() {
+  $page = drupal_get_form('hvz_cure_generate_form');
+  $query = db_query("SELECT * FROM {hvz_cure} ORDER BY `cid`");
+  $headers = array(
+    'Cure #',
+    'Cure ID',
+  );
+  $rows = array();
+  while ($cure = db_fetch_object($query)) {
+    $rows[]=array(
+        $cure->cid,
+        $cure->cure,
+    );
+  }
+  $page .='<br />' . theme_table($headers, $rows);
+  return $page;
+}
+
+function hvz_cure_generate_form() {
+  $form = array();
+
+  $form['hvz_cure_generate'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Number of cures to generate'),
+    '#size' => 10,
+    '#maxlength' => variable_get('hvz_cureidlength', 10),
+    '#description' => t("Enter an additional number of cures to generate."),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+function hvz_cure_generate_form_submit($form, &$form_state) {
+  $number = $form_state['values']['hvz_cure_generate'];
+  $cures = array();
+  for ($i=1; $i<=$number; $i++) {
+    $query = db_query("INSERT INTO {hvz_cure} (cure) VALUES ('%s') ", hvz_cure_generate_cure());
+  }
+}
